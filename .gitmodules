@@ -1,0 +1,3 @@
+[submodule "games/surgery_sim/observatory"]
+	path = games/surgery_sim/observatory
+	url = https://github.com/TransluceAI/observatory.git
