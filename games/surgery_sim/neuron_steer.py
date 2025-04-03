@@ -7,9 +7,47 @@ import matplotlib.pyplot as plt
 import datetime
 
 timestamp = datetime.datetime.now().strftime("%d%H%M")
-from utils import load_model
 
 device = torch.device("cuda")
+
+def load_model(args):
+    model_name_or_path = args.model
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name_or_path,
+        torch_dtype=torch.bfloat16,
+        trust_remote_code=True,
+        device_map="auto",
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name_or_path, trust_remote_code=True, use_fast=False
+    )
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+    tokenizer.padding_side = "left"
+    tokenizer.mask_token_id = tokenizer.eos_token_id
+    tokenizer.sep_token_id = tokenizer.eos_token_id
+    tokenizer.cls_token_id = tokenizer.eos_token_id
+
+    if any([n in model_name_or_path for n in ["llama", "zephyr", "gemma", "mistral", "Qwen", "llava"]]):
+        module_str_dict = {
+            "layer": "model.model.layers[{layer_idx}]",
+            "attn": "model.model.layers[{layer_idx}].self_attn.o_proj",
+        }
+        n_layers = len(model.model.layers)
+    elif "gpt-j" in model_name_or_path:
+        module_str_dict = {
+            "layer": "model.transformer.h[{layer_idx}]",
+            "attn": "model.transformer.h[{layer_idx}].attn.o_proj",
+        }
+        n_layers = len(model.transformer.h)
+    elif "opt" in model_name_or_path:
+        module_str_dict = {
+            "layer": "model.model.decoder.layers[{layer_idx}]",
+            "attn": "model.model.decoder.layers[{layer_idx}].self_attn.o_proj",
+        }
+        n_layers = len(model.model.decoder.layers)
+    args.module_str_dict = module_str_dict
+    args.n_layers = n_layers
+    return model, tokenizer
 
 def steer_token_activations_logits(model_a, tokenizer, input_strings, args_b, neuron_list_to_steer, token_a, token_b):
     """
