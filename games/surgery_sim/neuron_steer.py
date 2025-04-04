@@ -56,7 +56,7 @@ def load_model(args):
     args.n_layers = n_layers
     return model, tokenizer
 
-def steer_token_activations_logits(model_a, tokenizer, input_strings, args_b, neuron_list_to_steer, token_a, token_b):
+def steer_token_activations_logits(model_a, tokenizer, input_strings, neuron_list_to_steer, token_a, token_b):
     """
     Given a list of neurons (with attributes layer, neuron, token) to steer,
     progressively applies interventions on the activations and returns the changes in 
@@ -129,14 +129,13 @@ def steer_token_activations_logits(model_a, tokenizer, input_strings, args_b, ne
                     for (n_idx, t_idx) in interventions_by_layer[layer_idx]:
                         # Zero out the activation at the specified token (t_idx) and neuron index (n_idx)
                         # (Assuming t_idx is a valid index in the sequence length)
-                        output[:, t_idx, n_idx] = 10.0
+                        output[:, t_idx, n_idx] = 250.0
                 return output
             return hook
         
         # Register hooks for each layer that requires intervention.
         for layer_idx in interventions_by_layer.keys():
             # Retrieve the module where interventions should be applied.
-            # (This assumes that your model has an attribute model.layers and each layer has an mlp.down_proj module.)
             module = model_a.model.layers[layer_idx].mlp.up_proj
             handle = module.register_forward_hook(get_hook(layer_idx))
             hooks.append(handle)
@@ -171,24 +170,24 @@ def get_args():
     parser.add_argument("--batch-size", "-bs", type=int, default=10)
     return parser.parse_args()
 
-def plot_results(log_prob_a_changes, log_prob_b_changes, token_a, token_b):
-    x_labels = [str(i) for i in range(len(log_prob_a_changes))]
+def plot_results(results_a, results_b, token_a, token_b, ylabel, title):
+    x_labels = [str(i) for i in range(len(results_a))]
     plt.figure(figsize=(12, 8))
     
-    plt.plot(range(len(log_prob_a_changes)), log_prob_a_changes, marker='o', label=f"Token A ({token_a})")
-    plt.plot(range(len(log_prob_b_changes)), log_prob_b_changes, marker='x', label=f"Token B ({token_b})")
+    plt.plot(range(len(results_a)), results_a, marker='o', label=f"Token A ({token_a})")
+    plt.plot(range(len(results_b)), results_b, marker='x', label=f"Token B ({token_b})")
     
-    for i, (a, b) in enumerate(zip(log_prob_a_changes, log_prob_b_changes)):
+    for i, (a, b) in enumerate(zip(results_a, results_b)):
         plt.text(i, a.item(), f'{a.item():.2f}', ha='center', va='bottom', fontsize=8)
         plt.text(i, b.item(), f'{b.item():.2f}', ha='center', va='bottom', fontsize=8)
     
     plt.xlabel('Neurons Steered')
-    plt.ylabel('Log Probability')
-    plt.title('Log Probability Changes Across Neuron Steer')
+    plt.ylabel(ylabel)
+    plt.title(title)
     plt.legend()
     plt.xticks(range(len(x_labels)), x_labels)
     plt.grid(True)
-    plt.savefig(f'../figures/neuron_steer_{timestamp}.png')
+    plt.savefig(f'figures/neuron_steer_{ylabel}_{timestamp}.png')
     plt.show()
 
 
@@ -197,13 +196,13 @@ if __name__ == "__main__":
     model_a, tokenizer = load_model(args)
     model_a.to(device)
 
-    token1 = "hi"
-    token2 = "hello"
+    token1 = "minor"
+    token2 = "adult"
 
-    prompts = [] 
+    prompts = ["Joey is 21. In the eyes of the law he is an "]
     
     for i in prompts:
-        inputs = tokenizer.apply_chat_template([{"role" : "user", "content": i}, {"role": "assistant", "content": ""}])
+        inputs = tokenizer.apply_chat_template([{"role" : "user", "content": i}])
         print(inputs)
 
         input_ids = inputs
@@ -218,7 +217,8 @@ if __name__ == "__main__":
     token_a = tokenizer.convert_tokens_to_ids(f"Ġ{token1}")
     token_b = tokenizer.convert_tokens_to_ids(f"Ġ{token2}")
 
-    neuron_paths = ["meta-llama/Meta-Llama-3.1-8B-Instruct_3_4466_None"]
+    neuron_paths = ["meta-llama/Meta-Llama-3.1-8B-Instruct_7_8447_None"]
+    neuron_descriptions = [ "tokens related to harm or inappropriate behavior, specifically those indicating contact or action with minors (e.g., \"mole{{sts}}\", \"molester\", \"sut{{ure}}\", \"congregation\"), and tokens related to detailed physical or surgical terms (e.g., \"rect{{al}}\", \"s{{uture}}\")."]
     neuron_list_to_steer = []
     for neuron_path in neuron_paths:
         layer = neuron_path.split("_")[-3]
@@ -229,4 +229,15 @@ if __name__ == "__main__":
         model_a, tokenizer, prompts, args, neuron_list_to_steer, token_a, token_b
     )
     
-    plot_results(log_prob_a_changes, log_prob_b_changes, token_a, token_b)
+    plot_results([change.cpu().float() for change in log_prob_a_changes], 
+                [change.cpu().float() for change in log_prob_b_changes], 
+                token1,
+                token2,
+                'Change in Log Probability', 
+                'Log Probability Changes Across Neuron Steer')
+    plot_results([change.cpu().float() for change in log_probs_a], 
+                [change.cpu().float() for change in log_probs_b], 
+                token1,
+                token2,
+                'Log Probability', 
+                'Log Probabilities Across Neuron Steer')
