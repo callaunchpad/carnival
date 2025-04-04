@@ -5,10 +5,17 @@ import torch
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import datetime
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 timestamp = datetime.datetime.now().strftime("%d%H%M")
 
 device = torch.device("cuda")
+
+class Neuron:
+    def __init__(self, layer, neuron, token):
+        self.layer = layer
+        self.neuron = neuron
+        self.token = token
 
 def load_model(args):
     model_name_or_path = args.model
@@ -122,7 +129,7 @@ def steer_token_activations_logits(model_a, tokenizer, input_strings, args_b, ne
                     for (n_idx, t_idx) in interventions_by_layer[layer_idx]:
                         # Zero out the activation at the specified token (t_idx) and neuron index (n_idx)
                         # (Assuming t_idx is a valid index in the sequence length)
-                        output[:, t_idx, n_idx] = 0.0
+                        output[:, t_idx, n_idx] = 10.0
                 return output
             return hook
         
@@ -210,8 +217,13 @@ if __name__ == "__main__":
     
     token_a = tokenizer.convert_tokens_to_ids(f"Ġ{token1}")
     token_b = tokenizer.convert_tokens_to_ids(f"Ġ{token2}")
-    
-    neuron_list_to_steer =[]
+
+    neuron_paths = ["meta-llama/Meta-Llama-3.1-8B-Instruct_3_4466_None"]
+    neuron_list_to_steer = []
+    for neuron_path in neuron_paths:
+        layer = neuron_path.split["_"][-3]
+        neuron = neuron_path.split["_"][-2]
+        neuron_list_to_steer.append(Neuron(layer, neuron, -1))
     
     log_prob_a_changes, log_prob_b_changes = steer_token_activations_logits(
         model_a, tokenizer, prompts, args, neuron_list_to_steer, token_a, token_b
