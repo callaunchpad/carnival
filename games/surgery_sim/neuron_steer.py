@@ -137,7 +137,7 @@ def steer_token_activations_logits(model_a, tokenizer, input_strings, args_b, ne
         for layer_idx in interventions_by_layer.keys():
             # Retrieve the module where interventions should be applied.
             # (This assumes that your model has an attribute model.layers and each layer has an mlp.down_proj module.)
-            module = model_a.model.layers[layer_idx].mlp.down_proj
+            module = model_a.model.layers[layer_idx].mlp.up_proj
             handle = module.register_forward_hook(get_hook(layer_idx))
             hooks.append(handle)
         
@@ -221,8 +221,8 @@ if __name__ == "__main__":
     neuron_paths = ["meta-llama/Meta-Llama-3.1-8B-Instruct_3_4466_None"]
     neuron_list_to_steer = []
     for neuron_path in neuron_paths:
-        layer = neuron_path.split["_"][-3]
-        neuron = neuron_path.split["_"][-2]
+        layer = neuron_path.split("_")[-3]
+        neuron = neuron_path.split("_")[-2]
         neuron_list_to_steer.append(Neuron(layer, neuron, -1))
     
     log_prob_a_changes, log_prob_b_changes = steer_token_activations_logits(
