@@ -18,14 +18,7 @@ class Neuron:
         self.neuron = neuron
         self.token = token
         
-def steer_token_activations_logits(model, tokenizer, input_strings, neuron_list_to_steer, token_a, token_b):
-    """
-    Given a list of neurons (with attributes layer, neuron, token) to steer,
-    progressively applies interventions on the activations and returns the changes in 
-    log probabilities for token_a and token_b.
-    
-    for now, the intervention here is done by zeroing out the activation of the specified neuron at the specified token position.
-    """
+def get_activation_stats(model, tokenizer, input_strings, neuron_list_to_steer):
     # Format each input string into a chat-style prompt
     input_formatted_list = []
     for input_string in input_strings:
@@ -51,26 +44,12 @@ def steer_token_activations_logits(model, tokenizer, input_strings, neuron_list_
     device = next(model.parameters()).device
     batch = {k: v.to(device) for k, v in batch.items()}
     
-    # Baseline forward pass without interventions
-    model.eval()
-    with torch.no_grad():
-        baseline_output = model(**batch)
-        # Assume output is a ModelOutput with logits of shape (batch, seq_len, vocab_size)
-        baseline_logits = baseline_output.logits[0]  # take first element (shape: [seq_len, vocab_size])
-        baseline_log_probs = F.log_softmax(baseline_logits, dim=-1)
-        # Here we take the log probability from the last token in the sequence.
-        baseline_log_prob_a = baseline_log_probs[-1, token_a]
-        baseline_log_prob_b = baseline_log_probs[-1, token_b]
-    
-    # Prepare lists to store the changes in log probability for each intervention step
-    log_probs_a = []
-    log_probs_b = []
-    log_prob_a_changes = []
-    log_prob_b_changes = []
-    
     # Sort the list of neurons for consistency (each neuron should have attributes: layer, neuron, token)
     neuron_list_to_steer = sorted(neuron_list_to_steer, key=lambda x: (x.layer, x.token, x.neuron))
-    
+    neuron_activations = {}
+    for neuron in neuron_list_to_steer:
+        neuron_activations[str(neuron.layer)+'/'+str(neuron.neuron)] = []
+
     # For a progressive intervention, we gradually add one more neuron each step.
     num_interventions = len(neuron_list_to_steer)
     for k in range(num_interventions + 1):
@@ -93,7 +72,7 @@ def steer_token_activations_logits(model, tokenizer, input_strings, neuron_list_
                     for (n_idx, t_idx) in interventions_by_layer[layer_idx]:
                         # Zero out the activation at the specified token (t_idx) and neuron index (n_idx)
                         # (Assuming t_idx is a valid index in the sequence length)
-                        output[:, t_idx, n_idx] = 250.0
+                        neuron_activations[str(neuron.layer)+'/'+str(neuron.neuron)].append(output[:, t_idx, n_idx])
                 return output
             return hook
         
@@ -105,28 +84,15 @@ def steer_token_activations_logits(model, tokenizer, input_strings, neuron_list_
             hooks.append(handle)
         
         # Forward pass with the current interventions in place
+        model.eval()
         with torch.no_grad():
             intervened_output = model(**batch)
-            intervened_logits = intervened_output.logits[0]
-            intervened_log_probs = F.log_softmax(intervened_logits, dim=-1)
-            # Again, assume we are interested in the log probs at the final token position.
-            intervened_log_prob_a = intervened_log_probs[-1, token_a]
-            intervened_log_prob_b = intervened_log_probs[-1, token_b]
         
         # Remove the hooks to restore original behavior
         for handle in hooks:
             handle.remove()
-        
-        # Compute the change in log probability relative to baseline
-        delta_a = intervened_log_prob_a - baseline_log_prob_a
-        delta_b = intervened_log_prob_b - baseline_log_prob_b
-        
-        log_probs_a.append(intervened_log_prob_a)
-        log_probs_b.append(intervened_log_prob_b)
-        log_prob_a_changes.append(delta_a)
-        log_prob_b_changes.append(delta_b)
     
-    return log_prob_a_changes, log_prob_b_changes
+    return neuron_activations
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -161,11 +127,28 @@ if __name__ == "__main__":
     model, tokenizer = load_model(args)
     model.to(device)
 
-    token1 = "minor"
-    token2 = "adult"
+    prompts = ["The ball was passed to ",
+               "The final shot was taken by ",
+               "With seconds left, the ball was in the hands of ",
+               "The MVP of the game was ",
+               "The crowd erupted when ",
+               "One of the greatest players of all time is ",
+               "On the fast break, the ball found "
+               "The star player on the court was ",
+               "Leading the team in points was ",
+               "All eyes were on ",
+               "The player who changed the game was ",
+               "Known for his clutch performances ",
+               "The announcer shouted the name ",
+               "He pulled up from three — it's ",
+               "She handed the ball off to ",
+               "The highlight reel featured ",
+               "No one could guard ",
+               "In the fourth quarter, they gave the ball to ",
+               "At the top of the key stood ",
+               "The jersey with number 6 belongs to "
+            ]
 
-    prompts = ["Joey is 21. In the eyes of the law he is an "]
-    
     for i in prompts:
         inputs = tokenizer.apply_chat_template([{"role" : "user", "content": i}])
         print(inputs)
@@ -178,31 +161,16 @@ if __name__ == "__main__":
         for token, token_id in token_text_pairs:
             print(f"Token {i}: {token}, Token ID: {token_id}")
             i += 1
-    
-    token_a = tokenizer.convert_tokens_to_ids(f"Ġ{token1}")
-    token_b = tokenizer.convert_tokens_to_ids(f"Ġ{token2}")
 
-    neuron_paths = ["meta-llama/Meta-Llama-3.1-8B-Instruct_7_8447_None"]
-    neuron_descriptions = [ "tokens related to harm or inappropriate behavior, specifically those indicating contact or action with minors (e.g., \"mole{{sts}}\", \"molester\", \"sut{{ure}}\", \"congregation\"), and tokens related to detailed physical or surgical terms (e.g., \"rect{{al}}\", \"s{{uture}}\")."]
+    # tokens related to harm or inappropriate behavior, specifically those indicating contact or action with minors (e.g., \"mole{{sts}}\", \"molester\", \"sut{{ure}}\", \"congregation\"), and tokens related to detailed physical or surgical terms (e.g., \"rect{{al}}\", \"s{{uture}}\")."
+    # neuron_paths = ["meta-llama/Meta-Llama-3.1-8B-Instruct_7_8447_None"]
+    # proper nouns related to basketball, particularly "NBA" and variations like "basketball" and "durant" or "lebron"
+    neuron_paths = ["meta-llama/Meta-Llama-3.1-8B-Instruct_2_10263_None"]
     neuron_list_to_steer = []
     for neuron_path in neuron_paths:
         layer = neuron_path.split("_")[-3]
         neuron = neuron_path.split("_")[-2]
         neuron_list_to_steer.append(Neuron(layer, neuron, -1))
     
-    log_probs_a, log_probs_b, log_prob_a_changes, log_prob_b_changes = steer_token_activations_logits(
-        model, tokenizer, prompts, args, neuron_list_to_steer, token_a, token_b
-    )
-    
-    plot_results([change.cpu().float() for change in log_prob_a_changes], 
-                [change.cpu().float() for change in log_prob_b_changes], 
-                token1,
-                token2,
-                'Change in Log Probability', 
-                'Log Probability Changes Across Neuron Steer')
-    plot_results([change.cpu().float() for change in log_probs_a], 
-                [change.cpu().float() for change in log_probs_b], 
-                token1,
-                token2,
-                'Log Probability', 
-                'Log Probabilities Across Neuron Steer')
+    neuron_activations = get_activation_stats(model, tokenizer, prompts, neuron_paths)
+    print(neuron_activations)
