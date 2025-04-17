@@ -1,11 +1,20 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import CarnivalLanding from "./components/CarnivalLanding"
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import CarnivalLanding from "./components/CarnivalLanding";
+import SurgicalSimulator from "./components/SurgicalSimulator";
+import PolysemanticNeurons from './components/PolysemanticNeurons';
+import AdversarialAttack from './components/AdversarialAttack';
 
 function App() {
-  return <CarnivalLanding/>;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<CarnivalLanding />} />
+        <Route path="/surgical-simulator" element={<SurgicalSimulator />} />
+        <Route path="/adversarial-attack" element={<AdversarialAttack />} />
+        <Route path="/polysemantic-neurons" element={<PolysemanticNeurons />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
