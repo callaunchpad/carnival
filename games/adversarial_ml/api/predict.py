@@ -15,6 +15,26 @@ class Predictor(BasePredictor):
         self.img_path = 'api/three.png'
         self.img = torchvision.io.read_image(self.img_path)
 
+        #mine
+        # def predict(
+        #     self,
+        #     drawn_coords: str = Input(description="List of drawn coordinates"),
+        # ) -> dict:
+        #     """Run a single prediction on the model"""
+        #     # Preprocess image (put drawn coords onto it) ~ use min(image) as the value for a "drawn" coord
+
+        #     # Do inference
+        #     minVal = torch.min(self.img)
+        #     # Example input: "(1,2), (3,4)....."
+        #     cordinatesLst = drawn_coords.split(",")
+        #     for cord in cordinatesLst: 
+        #         pass
+
+            
+        #     prediction = True
+
+        #     return {"prediction": prediction}
+
     def predict(
         self,
         drawn_coords: str = Input(description="List of drawn coordinates, e.g., '(1,2), (3,4)'"),
