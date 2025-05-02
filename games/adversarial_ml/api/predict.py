@@ -1,29 +1,65 @@
 # Prediction interface for Cog ⚙️
 # https://cog.run/python
 
-from cog import BasePredictor, Input, Path
-from typing import List
+from cog import BasePredictor, Input
+from typing import Tuple
 import torch
+import torchvision
 
 
 class Predictor(BasePredictor):
     def setup(self) -> None:
         """Load the model into memory to make running multiple predictions efficient"""
         self.model = torch.load("MNIST_model.pth", map_location=torch.device("cpu"))
+        self.model.eval()
+        self.img_path = 'api/three.png'
+        self.img = torchvision.io.read_image(self.img_path)
+
+        #mine
+        # def predict(
+        #     self,
+        #     drawn_coords: str = Input(description="List of drawn coordinates"),
+        # ) -> dict:
+        #     """Run a single prediction on the model"""
+        #     # Preprocess image (put drawn coords onto it) ~ use min(image) as the value for a "drawn" coord
+
+        #     # Do inference
+        #     minVal = torch.min(self.img)
+        #     # Example input: "(1,2), (3,4)....."
+        #     cordinatesLst = drawn_coords.split(",")
+        #     for cord in cordinatesLst: 
+        #         pass
+
+            
+        #     prediction = True
+
+        #     return {"prediction": prediction}
 
     def predict(
         self,
-        drawn_coords: str = Input(description="List of drawn coordinates"),
+        drawn_coords: str = Input(description="List of drawn coordinates, e.g., '(1,2), (3,4)'"),
     ) -> dict:
         """Run a single prediction on the model"""
-        # processed_input = preprocess(image)
-        # output = self.model(processed_image, scale)
-        # return postprocess(output)
 
-        # Preprocess image (put drawn coords onto it) ~ use min(image) as the value for a "drawn" coord
+        # Clone image to avoid modifying original
+        edited = self.img.clone()
+        min_val = torch.min(edited)
 
-        # Do inference
-        prediction = True
+        try:
+            coords = drawn_coords.replace("(", "").replace(")", "").split(",")
+            coords = [int(c.strip()) for c in coords if c.strip().isdigit()]
+            coord_pairs = list(zip(coords[::2], coords[1::2]))
+        except Exception as e:
+            return {"prediction": None}
 
-        return {"prediction": prediction}
+        for x, y in coord_pairs:
+            if 0 <= y < edited.shape[1] and 0 <= x < edited.shape[2]:
+                edited[:, y, x] = min_val
 
+        input_tensor = edited.unsqueeze(0).float() / 255.0
+
+        with torch.no_grad():
+            output = self.model(input_tensor)
+            predicted_class = torch.argmax(output, dim=1).item()
+
+        return {"prediction": predicted_class}
