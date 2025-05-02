@@ -8,6 +8,7 @@
 torch
 sae-lens
 transformer-lens
+transformers
 
 
 # You can also add Git repos as dependencies, but you'll need to add git to the system_packages list in cog.yaml:

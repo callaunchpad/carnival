@@ -4,7 +4,6 @@
 # 
 numpy==1.26.4
 torch==2.2.1
-torchvision==0.17.1
 
 
 # You can also add Git repos as dependencies, but you'll need to add git to the system_packages list in cog.yaml:

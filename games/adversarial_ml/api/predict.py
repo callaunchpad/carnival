@@ -2,64 +2,57 @@
 # https://cog.run/python
 
 from cog import BasePredictor, Input
-from typing import Tuple
 import torch
-import torchvision
+import torch.nn as nn
 
+class MLP(nn.Module):
+  def __init__(self):
+    super().__init__()
+    self.flatten = nn.Flatten()
+    self.linear_relu_stack = nn.Sequential(
+        nn.Linear(28*28, 512),
+        nn.ReLU(),
+        nn.Linear(512, 512),
+        nn.ReLU(),
+        nn.Linear(512, 10)
+    )
+
+  def forward(self, x):
+    x = self.flatten(x)
+    logits = self.linear_relu_stack(x)
+    return logits
 
 class Predictor(BasePredictor):
     def setup(self) -> None:
         """Load the model into memory to make running multiple predictions efficient"""
-        self.model = torch.load("MNIST_model.pth", map_location=torch.device("cpu"))
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = MLP()
+        self.model.load_state_dict(torch.load('misc/CPU_WEIGHTS.pth'))
+        self.model = self.model.to(self.device)
         self.model.eval()
-        self.img_path = 'api/three.png'
-        self.img = torchvision.io.read_image(self.img_path)
 
-        #mine
-        # def predict(
-        #     self,
-        #     drawn_coords: str = Input(description="List of drawn coordinates"),
-        # ) -> dict:
-        #     """Run a single prediction on the model"""
-        #     # Preprocess image (put drawn coords onto it) ~ use min(image) as the value for a "drawn" coord
-
-        #     # Do inference
-        #     minVal = torch.min(self.img)
-        #     # Example input: "(1,2), (3,4)....."
-        #     cordinatesLst = drawn_coords.split(",")
-        #     for cord in cordinatesLst: 
-        #         pass
-
-            
-        #     prediction = True
-
-        #     return {"prediction": prediction}
+        self.img = torch.load('misc/three.pt').to(self.device)
+        self.label = 3
 
     def predict(
         self,
-        drawn_coords: str = Input(description="List of drawn coordinates, e.g., '(1,2), (3,4)'"),
+        drawn_coords: list[int] = Input(description="List of drawn coordinates, e.g., [1, 2, 3, 4] for [1,2] and [3,4]"),
     ) -> dict:
         """Run a single prediction on the model"""
 
         # Clone image to avoid modifying original
         edited = self.img.clone()
-        min_val = torch.min(edited)
+        max_val = torch.max(edited)
 
-        try:
-            coords = drawn_coords.replace("(", "").replace(")", "").split(",")
-            coords = [int(c.strip()) for c in coords if c.strip().isdigit()]
-            coord_pairs = list(zip(coords[::2], coords[1::2]))
-        except Exception as e:
-            return {"prediction": None}
+        # Example of drawn_coords: "1,2|3,4"
+        for i in range(0, len(drawn_coords), 2):
+            x, y = drawn_coords[i], drawn_coords[i+1]
+            edited[x, y] = max_val
 
-        for x, y in coord_pairs:
-            if 0 <= y < edited.shape[1] and 0 <= x < edited.shape[2]:
-                edited[:, y, x] = min_val
-
-        input_tensor = edited.unsqueeze(0).float() / 255.0
+        edited = edited.reshape(1, -1)
 
         with torch.no_grad():
-            output = self.model(input_tensor)
+            output = self.model(edited)
             predicted_class = torch.argmax(output, dim=1).item()
 
         return {"prediction": predicted_class}
