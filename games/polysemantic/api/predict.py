@@ -10,7 +10,7 @@ from transformers import AutoTokenizer
 from dotenv import load_dotenv
 import pickle
 
-load_dotenv() # Do we need this? Can't set env variable on replicate side.
+load_dotenv()
 
 class Predictor(BasePredictor):
     def setup(self) -> None:
@@ -25,7 +25,8 @@ class Predictor(BasePredictor):
 
         # Get SAE
         self.sae, cfg_dict, _ = SAE.from_pretrained(
-        release="gemma-2-2b-res-matryoshka-dc", sae_id=f"blocks.{self.layer}.hook_resid_post", device=self.device)
+        release="gemma-2-2b-res-matryoshka-dc", sae_id=f"blocks.{self.layer}.hook_resid_post")
+        self.sae = self.sae.to(self.device)
 
         # Feature index
         self.feature_index = 1644 # water feature
@@ -51,12 +52,13 @@ class Predictor(BasePredictor):
         # Access the layer activations
         layer_12_activations = cache[self.hook_point][0, -1, :]
 
-        # MIGHT NEED TO RESHAPE layer_12_activations
         sae_activations = self.sae.encode(layer_12_activations)
-        feature_activation = sae_activations[0, self.feature_index]
-
+        feature_activation = sae_activations[self.feature_index]
+        
+        pre_pca_activations = layer_12_activations.reshape(1, -1).detach().cpu()
+        
         # Project the layer output vector into 2D
-        projection = self.pca.transform(layer_12_activations)[0].tolist()
+        projection = self.pca.transform(pre_pca_activations)[0].tolist()
+        feature_activation = feature_activation.tolist()
 
         return {"projection": projection, "feature_activation" : feature_activation}
-
