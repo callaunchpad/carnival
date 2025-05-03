@@ -127,11 +127,6 @@ const PolysemanticNeurons = () => {
             </div>
           ) : searchResults.length > 0 ? (
             <div>
-              <h2 className="text-xl font-semibold mb-4 text-center">
-                {searchResults.length === 1 
-                  ? '1 word mapped' 
-                  : `${searchResults.length} words mapped`}
-              </h2>
               <div className="h-64 border border-gray-200 rounded-lg overflow-hidden">
                 <div className="w-full h-full relative bg-gray-50 border border-gray-200">
                   {/* Create a custom grid */}
@@ -151,7 +146,7 @@ const PolysemanticNeurons = () => {
                   >
                     <div className="w-5 h-5 bg-yellow-500 rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-md border-2 border-yellow-600 animate-pulse"></div>
                     <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-10">
-                      ??? [??, ??]
+                      ???
                     </div>
                   </div>
                   
@@ -167,7 +162,7 @@ const PolysemanticNeurons = () => {
                     >
                       <div className={`w-4 h-4 ${result.color} rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-md hover:w-5 hover:h-5 transition-all duration-200`}></div>
                       <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-10">
-                        {result.word}: [{result.coords[0]}, {result.coords[1]}]
+                        {result.word}
                       </div>
                     </div>
                   ))}

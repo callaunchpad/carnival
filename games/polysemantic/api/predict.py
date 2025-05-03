@@ -4,6 +4,7 @@
 from cog import BasePredictor, Input, Path
 from typing import List
 from transformer_lens import HookedTransformer
+from sae_lens import SAE
 import torch
 from transformers import AutoTokenizer
 from dotenv import load_dotenv
@@ -21,6 +22,13 @@ class Predictor(BasePredictor):
         # get hook point
         self.hook_point = f"blocks.{self.layer}.hook_resid_post"
         self.tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b")
+
+        # Get SAE
+        self.sae, cfg_dict, _ = SAE.from_pretrained(
+        release="gemma-2-2b-res-matryoshka-dc", sae_id=f"blocks.{self.layer}.hook_resid_post", device=self.device)
+
+        # Feature index
+        self.feature_index = 1644 # water feature
 
         # load pca
         with open('pca_model.pkl', 'rb') as f:
@@ -44,9 +52,11 @@ class Predictor(BasePredictor):
         layer_12_activations = cache[self.hook_point][0, -1, :]
 
         # MIGHT NEED TO RESHAPE layer_12_activations
+        sae_activations = self.sae.encode(layer_12_activations)
+        feature_activation = sae_activations[0, self.feature_index]
 
         # Project the layer output vector into 2D
         projection = self.pca.transform(layer_12_activations)[0].tolist()
 
-        return {"activations": projection}
+        return {"projection": projection, "feature_activation" : feature_activation}
 
