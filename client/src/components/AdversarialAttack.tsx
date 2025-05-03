@@ -69,9 +69,9 @@ const AdversarialAttack: React.FC = () => {
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / cellSize);
-    const y = Math.floor((e.clientY - rect.top) / cellSize);
-
+    const x = Math.floor((e.clientY - rect.top) / cellSize);
+    const y = Math.floor((e.clientX - rect.left) / cellSize);
+    
     const index = drawnPoints.findIndex(p => p.x === x && p.y === y);
     if (index === -1) {
       setDrawnPoints(prev => [...prev, { x, y }]);
