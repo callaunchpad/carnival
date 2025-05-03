@@ -27,13 +27,15 @@ class Predictor(BasePredictor):
     ) -> dict:
         """Run a single prediction on the model"""
         # Tokenize the guess
+        prompt = f"Repeat exactly: {guess}"
+
         tokens = self.tokenizer(guess, return_tensors="pt").to(self.device)
         input_ids = tokens["input_ids"]
 
         # Do inference with cache
         logits, cache = self.model.run_with_cache(input_ids)
 
-        # Access the activations at the exact hook point your SAE was trained on
+        # Access the layer activations
         layer_12_activations = cache[self.hook_point][0, -1, :]
 
         # Project the layer output vector into 2D
