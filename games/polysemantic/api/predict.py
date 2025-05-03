@@ -7,19 +7,24 @@ from transformer_lens import HookedTransformer
 import torch
 from transformers import AutoTokenizer
 from dotenv import load_dotenv
+import pickle
 
-load_dotenv()
+load_dotenv() # Do we need this? Can't set env variable on replicate side.
 
 class Predictor(BasePredictor):
     def setup(self) -> None:
         """Load the model into memory to make running multiple predictions efficient"""
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.layer = 12
-
         self.model = HookedTransformer.from_pretrained("gemma-2-2b", device=self.device)
+
         # get hook point
         self.hook_point = f"blocks.{self.layer}.hook_resid_post"
         self.tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b")
+
+        # load pca
+        with open('pca_model.pkl', 'rb') as f:
+            self.pca = pickle.load(f)
 
     def predict(
         self,
@@ -29,7 +34,7 @@ class Predictor(BasePredictor):
         # Tokenize the guess
         prompt = f"Repeat exactly: {guess}"
 
-        tokens = self.tokenizer(guess, return_tensors="pt").to(self.device)
+        tokens = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         input_ids = tokens["input_ids"]
 
         # Do inference with cache
@@ -39,7 +44,7 @@ class Predictor(BasePredictor):
         layer_12_activations = cache[self.hook_point][0, -1, :]
 
         # Project the layer output vector into 2D
-        coords = [1, 2]
+        projection = self.pca.transform(layer_12_activations)[0].tolist()
 
-        return {"activations": layer_12_activations.tolist()}
+        return {"activations": projection}
 
