@@ -35,7 +35,6 @@ class Predictor(BasePredictor):
 
         # Access the activations at the exact hook point your SAE was trained on
         layer_12_activations = cache[self.hook_point][0, -1, :]
-        print(f"layer 12 activations: {layer_12_activations.shape}")
 
         # Project the layer output vector into 2D
         coords = [1, 2]

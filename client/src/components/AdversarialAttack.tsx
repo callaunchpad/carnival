@@ -1,232 +1,183 @@
 import React, { useRef, useState, useEffect } from 'react';
+import threeImage from '../assets/three.png';
 
 const AdversarialAttack: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [drawing, setDrawing] = useState(false);
-  const [drawnPoints, setDrawnPoints] = useState<Array<{x: number, y: number}>>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [drawnPoints, setDrawnPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [result, setResult] = useState<string | null>(null);
-  
-  const canvasSize = 280; // 10x the original 28x28 for better UX
-  const imageSize = 28; // Original image size
-  
+  const [isLoading, setIsLoading] = useState(false);
+
+  const canvasSize = 280;
+  const imageSize = 28;
+  const cellSize = canvasSize / imageSize;
+
   useEffect(() => {
+    drawCanvas();
+  }, [drawnPoints]);
+
+  const drawCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
+
     // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw background image
+    ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+    // Draw image or fallback
     const img = new Image();
-    img.src = 'image.png'; // This should be your actual image path
+    img.src = threeImage;
     img.onload = () => {
-      // Scale the small 28x28 image to fit the canvas
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvasSize, canvasSize);
+      drawGrid(ctx);
+      drawPoints(ctx);
     };
     img.onerror = () => {
-      // If image fails to load, show a placeholder
       ctx.fillStyle = '#f0f0f0';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#999';
-      ctx.font = '14px Arial';
-      ctx.fillText('Image placeholder (28x28)', 70, canvasSize/2);
+      ctx.fillRect(0, 0, canvasSize, canvasSize);
+      ctx.fillStyle = '#888';
+      ctx.fillText('Image not found', 90, canvasSize / 2);
+      drawGrid(ctx);
+      drawPoints(ctx);
     };
-  }, []);
-  
-  // Handle drawing events
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    setDrawing(true);
-    const { offsetX, offsetY } = getPointerPosition(e);
-    addPoint(offsetX, offsetY);
   };
-  
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!drawing) return;
-    const { offsetX, offsetY } = getPointerPosition(e);
-    addPoint(offsetX, offsetY);
+
+  const drawGrid = (ctx: CanvasRenderingContext2D) => {
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= imageSize; i++) {
+      const pos = i * cellSize;
+      ctx.beginPath();
+      ctx.moveTo(pos, 0);
+      ctx.lineTo(pos, canvasSize);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, pos);
+      ctx.lineTo(canvasSize, pos);
+      ctx.stroke();
+    }
   };
-  
-  const endDrawing = () => {
-    setDrawing(false);
+
+  const drawPoints = (ctx: CanvasRenderingContext2D) => {
+    ctx.fillStyle = '#fff';
+    for (const point of drawnPoints) {
+      ctx.fillRect(point.x * cellSize, point.y * cellSize, cellSize, cellSize);
+    }
   };
-  
-  // Get pointer position for both mouse and touch events
-  const getPointerPosition = (e: React.MouseEvent | React.TouchEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { offsetX: 0, offsetY: 0 };
-    
-    if ('touches' in e) {
-      // Touch event
-      const rect = canvas.getBoundingClientRect();
-      const touch = e.touches[0];
-      return {
-        offsetX: touch.clientX - rect.left,
-        offsetY: touch.clientY - rect.top
-      };
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current!.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / cellSize);
+    const y = Math.floor((e.clientY - rect.top) / cellSize);
+
+    const index = drawnPoints.findIndex(p => p.x === x && p.y === y);
+    if (index === -1) {
+      setDrawnPoints(prev => [...prev, { x, y }]);
     } else {
-      // Mouse event
-      return {
-        offsetX: e.nativeEvent.offsetX,
-        offsetY: e.nativeEvent.offsetY
-      };
+      setDrawnPoints(prev => prev.filter((_, i) => i !== index));
     }
   };
-  
-  const addPoint = (x: number, y: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    // Draw on canvas
-    ctx.fillStyle = 'red';
-    ctx.beginPath();
-    ctx.arc(x, y, 5, 0, 2 * Math.PI);
-    ctx.fill();
-    
-    // Convert canvas coordinates to original image coordinates
-    const scaledX = Math.floor((x / canvasSize) * imageSize);
-    const scaledY = Math.floor((y / canvasSize) * imageSize);
-    
-    // Add to points array
-    setDrawnPoints(prev => [...prev, { x: scaledX, y: scaledY }]);
-  };
-  
-  const handleSubmit = async () => {
-    setIsLoading(true);
-    setResult(null);
-    
-    try {
-      // Call dummy API with the drawn points
-      // In a real app, replace this with your actual API endpoint
-      const response = await fetch('https://api.example.com/adversarial', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ points: drawnPoints }),
-      });
-      
-      const data = await response.json();
-      setResult(`API Response: ${JSON.stringify(data)}`);
-      
-      // For demo purposes, simulate API response
-      setTimeout(() => {
-        setResult(`API Response: Successfully processed ${drawnPoints.length} points.`);
-        setIsLoading(false);
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Error submitting data:', error);
-      setResult('Error: Failed to submit data. Check console for details.');
-      setIsLoading(false);
-    }
-  };
-  
+
   const handleClear = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Redraw the image
-    const img = new Image();
-    img.src = 'image.png';
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    };
-    img.onerror = () => {
-      ctx.fillStyle = '#f0f0f0';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#999';
-      ctx.font = '14px Arial';
-      ctx.fillText('Image placeholder (28x28)', 70, canvasSize/2);
-    };
-    
-    // Clear points
     setDrawnPoints([]);
     setResult(null);
   };
-  
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setResult(null);
+
+    try {
+      const response = await fetch('https://api.example.com/adversarial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points: drawnPoints }),
+      });
+
+      const data = await response.json();
+      setResult(`API Response: ${JSON.stringify(data)}`);
+    } catch (err) {
+      console.error(err);
+      setResult('Error: Failed to submit.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="adversarial-attack-container">
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        fontFamily: 'sans-serif',
+        color: '#000',
+      }}
+    >
       <h1>Adversarial Attack</h1>
-      <p>Draw on the image below, then submit to test the model.</p>
-      
-      <div className="canvas-container" style={{ margin: '20px 0' }}>
-        <canvas
-          ref={canvasRef}
-          width={canvasSize}
-          height={canvasSize}
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={endDrawing}
-          onMouseLeave={endDrawing}
-          onTouchStart={startDrawing}
-          onTouchMove={draw}
-          onTouchEnd={endDrawing}
-          style={{ 
-            border: '1px solid #ccc',
-            backgroundColor: '#fff',
-            touchAction: 'none' // Prevents scrolling while drawing on mobile
-          }}
-        />
-      </div>
-      
-      <div className="controls" style={{ marginTop: '10px' }}>
-        <button 
-          onClick={handleSubmit} 
+      <p>Click on cells in the 28x28 grid to fill them with white.</p>
+
+      <canvas
+        ref={canvasRef}
+        width={canvasSize}
+        height={canvasSize}
+        onClick={handleCanvasClick}
+        style={{
+          border: '1px solid #ccc',
+          margin: '20px 0',
+          cursor: 'pointer',
+        }}
+      />
+
+      <div style={{ marginBottom: '15px' }}>
+        <button
+          onClick={handleSubmit}
           disabled={isLoading || drawnPoints.length === 0}
-          style={{ 
+          style={{
             padding: '8px 16px',
             marginRight: '10px',
-            backgroundColor: drawnPoints.length === 0 ? '#ccc' : '#4285f4',
-            color: 'white',
+            backgroundColor: drawnPoints.length === 0 ? '#ccc' : '#4caf50',
+            color: '#fff',
             border: 'none',
             borderRadius: '4px',
-            cursor: drawnPoints.length === 0 ? 'not-allowed' : 'pointer'
+            cursor: drawnPoints.length === 0 ? 'not-allowed' : 'pointer',
           }}
         >
           {isLoading ? 'Submitting...' : 'Submit'}
         </button>
-        
-        <button 
+
+        <button
           onClick={handleClear}
-          style={{ 
+          style={{
             padding: '8px 16px',
             backgroundColor: '#f44336',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: 'pointer'
+            cursor: 'pointer',
           }}
         >
           Clear
         </button>
       </div>
-      
-      {drawnPoints.length > 0 && (
-        <div className="points-info" style={{ margin: '15px 0', fontSize: '14px' }}>
-          <p>Points drawn: {drawnPoints.length}</p>
-        </div>
-      )}
-      
+
+      {drawnPoints.length > 0 && <p>Points selected: {drawnPoints.length}</p>}
+
       {result && (
-        <div className="result" style={{ 
-          margin: '15px 0',
-          padding: '10px',
-          backgroundColor: '#f0f0f0',
-          borderRadius: '4px'
-        }}>
+        <div
+          style={{
+            marginTop: '15px',
+            padding: '10px',
+            borderRadius: '4px',
+            boxShadow: '0 0 5px rgba(0,0,0,0.1)',
+            maxWidth: '90%',
+          }}
+        >
           <p>{result}</p>
         </div>
       )}
