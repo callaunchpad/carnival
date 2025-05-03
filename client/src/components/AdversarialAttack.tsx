@@ -1,9 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import threeImage from '../assets/three.png';
 
-// Use environment variables in React
-const REPLICATE_API_TOKEN = import.meta.env.VITE_REPLICATE_KEY;
-
 const AdversarialAttack: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawnPoints, setDrawnPoints] = useState<Array<{ x: number; y: number }>>([]);
@@ -103,53 +100,42 @@ const AdversarialAttack: React.FC = () => {
     setResult(null);
     setShowCongrats(false);
     setPrediction(null);
-
+  
     try {
-      // Convert points array to flattened format [x1, y1, x2, y2, ...]
       const flattened = drawnPoints.reduce<number[]>((acc, point) => {
-        acc.push(point.y, point.x);
+        acc.push(point.x, point.y);
         return acc;
       }, []);
       
       setFlattenedPoints(flattened);
-
-      // Prepare the input with flattened points array
-      const input = {
-        version: "13e8796f49cc21ed91f8b3075584b62f230de87d21ac809729d1cc1e8a1f8893",
-        input: {
-          points: flattened
-        }
-      };
-
-      const response = await fetch('https://api.replicate.com/v1/predictions', {
+  
+      const response = await fetch('http://localhost:4167/api/predict', {
         method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${REPLICATE_API_TOKEN}`,
+        headers: {
           'Content-Type': 'application/json',
-          'Prefer': 'wait'
         },
-        body: JSON.stringify(input),
+        body: JSON.stringify({ points: flattened }),
       });
-
+  
       const data = await response.json();
-      setResult(`API Response: ${JSON.stringify(data)}`);
-      
-      // Check if the prediction is not 3
-      if (data && data.prediction !== undefined) {
-        const predictedValue = Number(data.prediction);
-        setPrediction(predictedValue);
-        
-        if (predictedValue !== 3) {
-          setShowCongrats(true);
-        }
+      setResult("Wow!");
+  
+      // Pull the actual predicted value depending on your server response shape
+      const predictedValue = Number(data.prediction.prediction);
+  
+      setPrediction(predictedValue);
+  
+      if (predictedValue !== 3) {
+        setShowCongrats(true);
       }
     } catch (err) {
       console.error(err);
-      setResult('Error: Failed to submit to Replicate API.');
+      setResult('Error: Failed to get prediction from backend.');
     } finally {
       setIsLoading(false);
     }
   };
+  
 
   return (
     <div
