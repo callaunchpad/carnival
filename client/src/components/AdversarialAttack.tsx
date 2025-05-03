@@ -1,6 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import threeImage from '../assets/three.png';
 
+// Use environment variables in React
+const REPLICATE_API_TOKEN = import.meta.env.VITE_REPLICATE_KEY;
+
 const AdversarialAttack: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawnPoints, setDrawnPoints] = useState<Array<{ x: number; y: number }>>([]);
@@ -69,9 +72,11 @@ const AdversarialAttack: React.FC = () => {
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    const x = Math.floor((e.clientY - rect.top) / cellSize);
-    const y = Math.floor((e.clientX - rect.left) / cellSize);
     
+    // Switch x and y here - y (row) comes from clientX, x (column) comes from clientY
+    const x = Math.floor((e.clientX - rect.left) / cellSize);
+    const y = Math.floor((e.clientY - rect.top) / cellSize);
+
     const index = drawnPoints.findIndex(p => p.x === x && p.y === y);
     if (index === -1) {
       setDrawnPoints(prev => [...prev, { x, y }]);
@@ -83,24 +88,64 @@ const AdversarialAttack: React.FC = () => {
   const handleClear = () => {
     setDrawnPoints([]);
     setResult(null);
+    setShowCongrats(false);
+    setPrediction(null);
+    setFlattenedPoints([]);
   };
+
+  const [showCongrats, setShowCongrats] = useState(false);
+  const [prediction, setPrediction] = useState<number | null>(null);
+
+  const [flattenedPoints, setFlattenedPoints] = useState<number[]>([]);
 
   const handleSubmit = async () => {
     setIsLoading(true);
     setResult(null);
+    setShowCongrats(false);
+    setPrediction(null);
 
     try {
-      const response = await fetch('https://api.example.com/adversarial', {
+      // Convert points array to flattened format [x1, y1, x2, y2, ...]
+      const flattened = drawnPoints.reduce<number[]>((acc, point) => {
+        acc.push(point.y, point.x);
+        return acc;
+      }, []);
+      
+      setFlattenedPoints(flattened);
+
+      // Prepare the input with flattened points array
+      const input = {
+        version: "13e8796f49cc21ed91f8b3075584b62f230de87d21ac809729d1cc1e8a1f8893",
+        input: {
+          points: flattened
+        }
+      };
+
+      const response = await fetch('https://api.replicate.com/v1/predictions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ points: drawnPoints }),
+        headers: { 
+          'Authorization': `Bearer ${REPLICATE_API_TOKEN}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'wait'
+        },
+        body: JSON.stringify(input),
       });
 
       const data = await response.json();
       setResult(`API Response: ${JSON.stringify(data)}`);
+      
+      // Check if the prediction is not 3
+      if (data && data.prediction !== undefined) {
+        const predictedValue = Number(data.prediction);
+        setPrediction(predictedValue);
+        
+        if (predictedValue !== 3) {
+          setShowCongrats(true);
+        }
+      }
     } catch (err) {
       console.error(err);
-      setResult('Error: Failed to submit.');
+      setResult('Error: Failed to submit to Replicate API.');
     } finally {
       setIsLoading(false);
     }
@@ -166,7 +211,11 @@ const AdversarialAttack: React.FC = () => {
         </button>
       </div>
 
-      {drawnPoints.length > 0 && <p>Points selected: {drawnPoints.length}</p>}
+      {drawnPoints.length > 0 && (
+        <div>
+          <p>Points selected: {drawnPoints.length}</p>
+        </div>
+      )}
 
       {result && (
         <div
@@ -179,6 +228,60 @@ const AdversarialAttack: React.FC = () => {
           }}
         >
           <p>{result}</p>
+          {prediction !== null && (
+            <p>Model prediction: <strong>{prediction}</strong></p>
+          )}
+        </div>
+      )}
+
+      {/* Congratulations Popup */}
+      {showCongrats && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              padding: '30px',
+              borderRadius: '8px',
+              textAlign: 'center',
+              maxWidth: '80%',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+            }}
+          >
+            <h2 style={{ color: '#4caf50', marginTop: 0 }}>Congratulations!</h2>
+            <p style={{ fontSize: '18px' }}>
+              You successfully fooled the model within {drawnPoints.length} changes! It predicted {prediction} instead of 3.
+            </p>
+            <p style={{ marginBottom: '20px' }}>
+              Your adversarial attack was successful.
+            </p>
+            <button
+              onClick={() => setShowCongrats(false)}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#4caf50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '16px',
+              }}
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
     </div>
