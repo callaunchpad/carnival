@@ -1,185 +1,210 @@
-import React, { useState } from 'react';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import React, { useState, useEffect } from 'react';
+import { Search } from 'lucide-react';
 
-// Define the structure for our map points
-interface Point {
-  id: number;
-  x: number;
-  y: number;
-  label: string;
-  description: string;
-}
+// Mock API call
+const fetchCoordinatesForWord = async (word) => {
+  // Simulate API delay
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      // Generate deterministic but seemingly random coordinates based on the word
+      const x = (word.charCodeAt(0) - 97) * 10 + (word.length * 5);
+      const y = (word.charCodeAt(word.length > 1 ? 1 : 0) - 97) * 8 + (word.length * 3);
+      resolve([x, y]);
+    }, 500);
+  });
+};
+
+// Secret word that user needs to guess
+const TARGET_WORD = "matcha";
+const TARGET_COORDINATES = [77, 59]; // Pre-calculated coordinates for "matcha"
 
 const PolysemanticNeurons = () => {
-  // Sample points data - you can expand this or load from an API
-  const [points] = useState<Point[]>([
-    { id: 1, x: 100, y: 50, label: "Point A", description: "Critical incision point" },
-    { id: 2, x: 200, y: 150, label: "Point B", description: "Secondary incision point" },
-    { id: 3, x: 150, y: 200, label: "Point C", description: "Suture location" },
-    { id: 4, x: 80, y: 220, label: "Point D", description: "Avoid this area" },
-    { id: 5, x: 250, y: 80, label: "Point E", description: "Entry point for catheter" },
-    // Adding more points spread out across a wider area
-    { id: 6, x: 350, y: 120, label: "Point F", description: "Nerve cluster" },
-    { id: 7, x: 450, y: 200, label: "Point G", description: "Artery location" },
-    { id: 8, x: 600, y: 150, label: "Point H", description: "Lymph node" },
-    { id: 9, x: 750, y: 180, label: "Point I", description: "Secondary artery" },
-    { id: 10, x: 850, y: 240, label: "Point J", description: "Potential blockage" },
-    // Points in various corners of the expanded map
-    { id: 11, x: 50, y: 50, label: "Point K", description: "Upper left region" },
-    { id: 12, x: 850, y: 50, label: "Point L", description: "Upper right region" },
-    { id: 13, x: 50, y: 550, label: "Point M", description: "Lower left region" },
-    { id: 14, x: 850, y: 550, label: "Point N", description: "Lower right region" },
-    { id: 15, x: 450, y: 550, label: "Point O", description: "Bottom center region" },
-    { id: 16, x: 450, y: 50, label: "Point P", description: "Top center region" },
-  ]);
-
-  // State for the point being hovered
-  const [hoveredPoint, setHoveredPoint] = useState<Point | null>(null);
+  const [word, setWord] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [error, setError] = useState('');
+  const [showWinPopup, setShowWinPopup] = useState(false);
+  const [hasWon, setHasWon] = useState(false);
   
-  // Map dimensions
-  const totalMapWidth = 1000;
-  const totalMapHeight = 600;
-  const visibleMapWidth = 800;
-  const visibleMapHeight = 600;
-  
-  // Handle mouse enter for a point
-  const handlePointMouseEnter = (point: Point) => {
-    setHoveredPoint(point);
+  const handleInputChange = (e) => {
+    const value = e.target.value.toLowerCase().replace(/[^a-z]/g, '');
+    if (value.length <= 10) {
+      setWord(value);
+      setError('');
+    }
   };
 
-  // Handle mouse leave for a point
-  const handlePointMouseLeave = () => {
-    setHoveredPoint(null);
+  const handleSubmit = async () => {
+    if (!word) {
+      setError('Please enter a word');
+      return;
+    }
+    
+    // Check if word already exists in search results
+    if (searchResults.some(result => result.word === word)) {
+      setError('This word has already been searched');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const coords = await fetchCoordinatesForWord(word);
+      // Add new result to the array of search results
+      setSearchResults(prev => [...prev, { 
+        word, 
+        coords,
+        color: getRandomColor() // Assign a random color to each word
+      }]);
+      
+      // Check if the user guessed the target word
+      if (word.toLowerCase() === TARGET_WORD && !hasWon) {
+        setHasWon(true);
+        setShowWinPopup(true);
+      }
+      
+      setWord(''); // Clear input field after successful search
+    } catch (err) {
+      setError('Failed to fetch coordinates');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Generate a random color for each search result
+  const getRandomColor = () => {
+    const colors = [
+      'bg-blue-500', 'bg-red-500', 'bg-green-500', 'bg-yellow-500', 
+      'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSubmit();
+    }
+  };
+  
+  // Close the win popup
+  const closeWinPopup = () => {
+    setShowWinPopup(false);
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Polysemantic Neurons</h1>
-      
-      <div className="mb-4">
-        <p>This is the polysemantic neuron page. Hover over points on the map to see details.</p>
-        <p className="text-sm text-gray-600">Use mouse drag to pan, scroll wheel or trackpad pinch gesture to zoom, and buttons for additional controls.</p>
-      </div>
-      
-      {/* The map container using TransformWrapper */}
-      <div 
-        className="border border-gray-300 rounded-md shadow-md overflow-hidden relative"
-        style={{ width: `${visibleMapWidth}px`, height: `${visibleMapHeight}px` }}
-      >
-        <TransformWrapper
-          initialScale={1}
-          initialPositionX={0}
-          initialPositionY={0}
-          minScale={0.5}
-          maxScale={3}
-          limitToBounds={false}
-          wheel={{ step: 0.1, touchPadEnabled: true }}
-          pinch={{ step: 5 }}
-        >
-          {({ zoomIn, zoomOut, resetTransform }) => (
-            <>
-              <div className="fixed bottom-3 right-3 z-20 flex space-x-2 bg-white bg-opacity-70 p-1 rounded-md shadow"
-                   style={{ position: 'absolute', right: '12px', bottom: '12px' }}>
-                <button 
-                  onClick={() => zoomIn()} 
-                  className="bg-white p-1 rounded hover:bg-gray-100"
-                  title="Zoom In"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    <line x1="11" y1="8" x2="11" y2="14"></line>
-                    <line x1="8" y1="11" x2="14" y2="11"></line>
-                  </svg>
-                </button>
-                <button 
-                  onClick={() => zoomOut()} 
-                  className="bg-white p-1 rounded hover:bg-gray-100"
-                  title="Zoom Out"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    <line x1="8" y1="11" x2="14" y2="11"></line>
-                  </svg>
-                </button>
-                <button 
-                  onClick={() => resetTransform()} 
-                  className="bg-white p-1 rounded hover:bg-gray-100"
-                  title="Reset View"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 2v6h6"></path>
-                    <path d="M21 12A9 9 0 0 0 6 5.3L3 8"></path>
-                    <path d="M21 22v-6h-6"></path>
-                    <path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"></path>
-                  </svg>
-                </button>
-              </div>
-              
-              <TransformComponent 
-                wrapperStyle={{ width: "100%", height: "100%" }}
-                contentStyle={{ width: `${totalMapWidth}px`, height: `${totalMapHeight}px` }}
+    <div className="min-h-screen py-12 px-4">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">Polysemantic Neurons</h1>
+        
+        <div className="bg-white/70 rounded-lg shadow-lg p-6 mb-8">
+          <p className="text-gray-600 mb-6">
+            Enter a single word (maximum 10 characters) to visualize its neural activation coordinates.
+          </p>
+          
+          <div className="mb-8">
+            <div className="relative">
+              <input
+                type="text"
+                value={word}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Enter a word..."
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-lg"
+                maxLength={10}
+              />
+              <button 
+                onClick={handleSubmit}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-700"
               >
-                <div 
-                  className="relative bg-white"
-                  style={{ width: `${totalMapWidth}px`, height: `${totalMapHeight}px` }}
-                >
-                  {/* Grid lines for reference */}
-                  <div className="absolute inset-0 grid grid-cols-10 grid-rows-6">
-                    {Array.from({ length: 60 }).map((_, i) => (
-                      <div key={i} className="border border-dashed border-gray-100"></div>
+                <Search size={20} />
+              </button>
+            </div>
+            {error && <p className="text-red-500 mt-2">{error}</p>}
+          </div>
+          
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : searchResults.length > 0 ? (
+            <div>
+              <h2 className="text-xl font-semibold mb-4 text-center">
+                {searchResults.length === 1 
+                  ? '1 word mapped' 
+                  : `${searchResults.length} words mapped`}
+              </h2>
+              <div className="h-64 border border-gray-200 rounded-lg overflow-hidden">
+                <div className="w-full h-full relative bg-gray-50 border border-gray-200">
+                  {/* Create a custom grid */}
+                  <div className="absolute inset-0 grid grid-cols-10 grid-rows-10">
+                    {[...Array(100)].map((_, i) => (
+                      <div key={i} className="border border-gray-100"></div>
                     ))}
                   </div>
                   
-                  {/* Render each point */}
-                  {points.map((point) => (
-                    <div
-                      key={point.id}
-                      className="absolute w-3 h-3 bg-black rounded-full cursor-pointer hover:w-4 hover:h-4 transition-all"
-                      style={{
-                        left: `${point.x}px`,
-                        top: `${point.y}px`,
-                        transform: 'translate(-50%, -50%)'
-                      }}
-                      onMouseEnter={() => handlePointMouseEnter(point)}
-                      onMouseLeave={handlePointMouseLeave}
-                    />
-                  ))}
+                  {/* Golden mystery target dot */}
+                  <div 
+                    className="absolute group z-20"
+                    style={{
+                      left: `${Math.min(Math.max((TARGET_COORDINATES[0] / 100) * 100, 5), 95)}%`,
+                      top: `${Math.min(Math.max((TARGET_COORDINATES[1] / 100) * 100, 5), 95)}%`,
+                    }}
+                  >
+                    <div className="w-5 h-5 bg-yellow-500 rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-md border-2 border-yellow-600 animate-pulse"></div>
+                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-10">
+                      ??? [??, ??]
+                    </div>
+                  </div>
                   
-                  {/* Tooltip for hovered point */}
-                  {hoveredPoint && (
+                  {/* Position all points based on their coordinates */}
+                  {searchResults.map((result, index) => (
                     <div 
-                      className="absolute bg-gray-800 text-white p-2 rounded-md shadow-lg z-10 pointer-events-none"
+                      key={index}
+                      className="absolute group"
                       style={{
-                        left: `${hoveredPoint.x}px`,
-                        top: `${hoveredPoint.y - 40}px`,
-                        transform: 'translateX(-50%)'
+                        left: `${Math.min(Math.max((result.coords[0] / 100) * 100, 5), 95)}%`,
+                        top: `${Math.min(Math.max((result.coords[1] / 100) * 100, 5), 95)}%`,
                       }}
                     >
-                      <div className="font-semibold">{hoveredPoint.label}</div>
-                      <div className="text-sm">{hoveredPoint.description}</div>
-                      <div className="text-xs text-gray-300">Position: [{hoveredPoint.x}, {hoveredPoint.y}]</div>
+                      <div className={`w-4 h-4 ${result.color} rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-md hover:w-5 hover:h-5 transition-all duration-200`}></div>
+                      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-10">
+                        {result.word}: [{result.coords[0]}, {result.coords[1]}]
+                      </div>
                     </div>
-                  )}
+                  ))}
                 </div>
-              </TransformComponent>
-            </>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-center items-center h-64 bg-gray-100 rounded-lg">
+              <p className="text-gray-500">Enter a word and search to visualize coordinates</p>
+            </div>
           )}
-        </TransformWrapper>
-      </div>
-      
-      {/* Legend or instructions */}
-      <div className="mt-4 p-3 bg-gray-100 rounded-md">
-        <h3 className="font-semibold">Map Navigation</h3>
-        <p className="text-sm">Hover over any black point to see details about that surgical landmark.</p>
-        <p className="text-sm mt-1">Navigation controls:</p>
-        <ul className="text-sm list-disc ml-5 mt-1">
-          <li>Click and drag to pan the map</li>
-          <li>Use mouse wheel or trackpad pinch gesture to zoom in/out</li>
-          <li>Use the buttons in the top-left corner for zoom in, zoom out, and reset</li>
-          <li>Double tap to quickly zoom in (works on trackpad and touch devices)</li>
-        </ul>
+          
+          {/* Win popup */}
+          {showWinPopup && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-8 max-w-md text-center shadow-xl transform transition-all">
+                <div className="mb-4 text-7xl">🎉</div>
+                <h3 className="text-2xl font-bold text-green-600 mb-4">Congratulations!</h3>
+                <p className="text-lg mb-6">You found the hidden word: <span className="font-bold">{TARGET_WORD}</span>!</p>
+                <button 
+                  onClick={closeWinPopup}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                >
+                  Continue Exploring
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <div className="bg-white/70 rounded-lg shadow-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">About Polysemantic Neurons</h2>
+          <p className="text-gray-600">
+            Polysemantic neurons are individual neurons in neural networks that respond to multiple unrelated concepts.
+            This tool allows you to explore how different words map to a 2D representation of neural activation patterns.
+          </p>
+        </div>
       </div>
     </div>
   );

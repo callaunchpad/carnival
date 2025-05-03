@@ -43,6 +43,8 @@ class Predictor(BasePredictor):
         # Access the layer activations
         layer_12_activations = cache[self.hook_point][0, -1, :]
 
+        # MIGHT NEED TO RESHAPE layer_12_activations
+
         # Project the layer output vector into 2D
         projection = self.pca.transform(layer_12_activations)[0].tolist()
 
