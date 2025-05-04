@@ -5,7 +5,9 @@ const SurgerySimulator = () => {
   return (
     <div>
       <h1>Surgery Simulator</h1>
-      <p>This is the surgery simulator page.</p>
+      <p>Check out neuron steering here:
+      https://monitor.transluce.org/dashboard/chat
+      </p>
     </div>
   );
 };
