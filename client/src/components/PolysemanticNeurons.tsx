@@ -1,22 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Search } from 'lucide-react';
 
-// Mock API call
+// Real API call to local Node server
 const fetchCoordinatesForWord = async (word) => {
-  // Simulate API delay
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // Generate deterministic but seemingly random coordinates based on the word
-      const x = (word.charCodeAt(0) - 97) * 10 + (word.length * 5);
-      const y = (word.charCodeAt(word.length > 1 ? 1 : 0) - 97) * 8 + (word.length * 3);
-      resolve([x, y]);
-    }, 500);
-  });
+  try {
+    const response = await fetch('http://localhost:4167/coordinates', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ word }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('API request failed:', error);
+    throw error;
+  }
 };
 
 // Secret word that user needs to guess
-const TARGET_WORD = "matcha";
-const TARGET_COORDINATES = [77, 59]; // Pre-calculated coordinates for "matcha"
+const TARGET_WORD = "water";
+const TARGET_COORDINATES = [17.219, 7.771];
 
 const PolysemanticNeurons = () => {
   const [word, setWord] = useState('');
@@ -48,12 +57,13 @@ const PolysemanticNeurons = () => {
     
     setIsLoading(true);
     try {
-      const coords = await fetchCoordinatesForWord(word);
+      const result = await fetchCoordinatesForWord(word);
       // Add new result to the array of search results
       setSearchResults(prev => [...prev, { 
         word, 
-        coords,
-        color: getRandomColor() // Assign a random color to each word
+        coords: result.coordinates,
+        scalar: result.scalar,
+        color: 'bg-orange-200'
       }]);
       
       // Check if the user guessed the target word
@@ -64,19 +74,11 @@ const PolysemanticNeurons = () => {
       
       setWord(''); // Clear input field after successful search
     } catch (err) {
-      setError('Failed to fetch coordinates');
+      setError('Failed to fetch coordinates from server');
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
-  };
-  
-  // Generate a random color for each search result
-  const getRandomColor = () => {
-    const colors = [
-      'bg-blue-500', 'bg-red-500', 'bg-green-500', 'bg-yellow-500', 
-      'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
   };
 
   const handleKeyDown = (e) => {
@@ -162,7 +164,7 @@ const PolysemanticNeurons = () => {
                     >
                       <div className={`w-4 h-4 ${result.color} rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-md hover:w-5 hover:h-5 transition-all duration-200`}></div>
                       <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-10">
-                        {result.word}
+                        {result.word} ({result.scalar})
                       </div>
                     </div>
                   ))}

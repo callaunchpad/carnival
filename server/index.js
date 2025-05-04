@@ -38,6 +38,40 @@ app.post('/api/predict', async (req, res) => {
   }
 });
 
+app.post('/coordinates', async (req, res) => {
+    try {
+      const { word } = req.body;
+      
+      console.log(`Received request for word: ${word}`);
+  
+      let output = await replicate.deployments.predictions.create(
+        "carnival",
+        "sp-25-lp-showcase",
+        {
+          input: {
+            guess: word
+          }
+        }
+      );
+      output = await replicate.wait(output);
+      console.log("Replicate output:", output);
+  
+      // Format the response to match what the frontend expects
+      const response = {
+        coordinates: [
+          output.output.projection[0],
+          output.output.projection[1]
+        ],
+        scalar: output.output.feature_activation
+      };
+  
+      res.json(response);
+    } catch (error) {
+      console.error("Error processing request:", error);
+      res.status(500).json({ error: 'Prediction failed.' });
+    }
+  });
+
 app.listen(port, () => {
   console.log(`Backend listening at http://localhost:${port}`);
 });
