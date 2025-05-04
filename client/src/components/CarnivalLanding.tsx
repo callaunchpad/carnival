@@ -40,26 +40,26 @@ export default function CarnivalLanding({}: CarnivalLandingProps): React.ReactNo
 
       {/* Mini-Games Grid */}
       <div className="grid grid-cols-2 gap-4 mt-12 w-full max-w-4xl">
+        <Link to="/adversarial-attack">
+          <motion.div className="p-6 bg-white shadow-lg rounded-lg" whileHover={{ scale: 1.05 }}>
+            <h2 className="text-xl font-bold text-[#D72638]">Adversarial Attack</h2>
+            <p className="text-gray-600 mt-2">Try to optimally fool a classifier!!</p>
+          </motion.div>
+        </Link>
+        <Link to="/feature-hunt">
+          <motion.div className="p-6 bg-white shadow-lg rounded-lg" whileHover={{ scale: 1.05 }}>
+            <h2 className="text-xl font-bold text-[#D72638]">Feature Hunt</h2>
+            <p className="text-gray-600 mt-2">Try to figure out the hidden feature!!.</p>
+          </motion.div>
+        </Link>
         <Link to="/surgical-simulator">
           <motion.div className="p-6 bg-white shadow-lg rounded-lg" whileHover={{ scale: 1.05 }}>
             <h2 className="text-xl font-bold text-[#D72638]">Surgery Simulator</h2>
             <p className="text-gray-600 mt-2">Test your precision in correcting model behavior.</p>
           </motion.div>
         </Link>
-        <Link to="/adversarial-attack">
-          <motion.div className="p-6 bg-white shadow-lg rounded-lg" whileHover={{ scale: 1.05 }}>
-            <h2 className="text-xl font-bold text-[#D72638]">Adversarial Attack</h2>
-            <p className="text-gray-600 mt-2">Fool an AI system with deceptive inputs.</p>
-          </motion.div>
-        </Link>
-        <Link to="/polysemantic-neurons">
-          <motion.div className="p-6 bg-white shadow-lg rounded-lg" whileHover={{ scale: 1.05 }}>
-            <h2 className="text-xl font-bold text-[#D72638]">Polysemantic Neurons</h2>
-            <p className="text-gray-600 mt-2">Explore neurons that encode multiple meanings.</p>
-          </motion.div>
-        </Link>
         <div className="p-6 bg-gray-200 shadow-lg rounded-lg flex items-center justify-center">
-          <p className="text-gray-500">Coming Soon...</p>
+          <p className="text-gray-500">Wooooweeeee</p>
         </div>
       </div>
 

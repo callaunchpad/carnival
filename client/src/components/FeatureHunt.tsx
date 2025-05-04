@@ -27,13 +27,21 @@ const fetchCoordinatesForWord = async (word) => {
 const TARGET_WORD = "water";
 const TARGET_COORDINATES = [17.219, 7.771];
 
-const PolysemanticNeurons = () => {
+const FeatureHunt = () => {
   const [word, setWord] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [error, setError] = useState('');
   const [showWinPopup, setShowWinPopup] = useState(false);
   const [hasWon, setHasWon] = useState(false);
+  
+  // Define map view state (center coordinates and zoom)
+  const [mapView, setMapView] = useState({
+    center: TARGET_COORDINATES,
+    zoom: 1,
+    viewportWidth: 100,
+    viewportHeight: 100
+  });
   
   const handleInputChange = (e) => {
     const value = e.target.value.toLowerCase().replace(/[^a-z]/g, '');
@@ -92,14 +100,44 @@ const PolysemanticNeurons = () => {
     setShowWinPopup(false);
   };
 
+  // Calculate score based on number of attempts
+  const calculateScore = () => {
+    const attempts = searchResults.length;
+    const maxScore = 100;
+    const penalty = 5; // Points deducted per attempt
+    
+    // Calculate score (higher is better)
+    let score = Math.max(maxScore - (attempts - 1) * penalty, 10); // Minimum score is 10
+    
+    return {
+      score,
+      attempts
+    };
+  };
+  
+  // Convert absolute coordinates to viewport coordinates
+  const toViewportCoords = (coords) => {
+    const [x, y] = coords;
+    const { center, viewportWidth, viewportHeight } = mapView;
+    
+    // Calculate the position relative to the center
+    const relX = ((x - center[0]) / viewportWidth) * 100 + 50;
+    const relY = ((y - center[1]) / viewportHeight) * 100 + 50;
+    
+    return [
+      Math.min(Math.max(relX, 5), 95), // Clamp between 5% and 95% of viewport
+      Math.min(Math.max(relY, 5), 95)  // Clamp between 5% and 95% of viewport
+    ];
+  };
+
   return (
     <div className="min-h-screen py-12 px-4">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">Polysemantic Neurons</h1>
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">FeatureHunt</h1>
         
         <div className="bg-white/70 rounded-lg shadow-lg p-6 mb-8">
           <p className="text-gray-600 mb-6">
-            Enter a single word (maximum 10 characters) to visualize its neural activation coordinates.
+            Enter your guess!!
           </p>
           
           <div className="mb-8">
@@ -138,12 +176,18 @@ const PolysemanticNeurons = () => {
                     ))}
                   </div>
                   
+                  {/* Add coordinate axes through the center */}
+                  <div className="absolute inset-0">
+                    <div className="absolute left-0 right-0 top-1/2 h-px bg-gray-300"></div>
+                    <div className="absolute top-0 bottom-0 left-1/2 w-px bg-gray-300"></div>
+                  </div>
+                  
                   {/* Golden mystery target dot */}
                   <div 
                     className="absolute group z-20"
                     style={{
-                      left: `${Math.min(Math.max((TARGET_COORDINATES[0] / 100) * 100, 5), 95)}%`,
-                      top: `${Math.min(Math.max((TARGET_COORDINATES[1] / 100) * 100, 5), 95)}%`,
+                      left: `50%`,
+                      top: `50%`,
                     }}
                   >
                     <div className="w-5 h-5 bg-yellow-500 rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-md border-2 border-yellow-600 animate-pulse"></div>
@@ -153,22 +197,60 @@ const PolysemanticNeurons = () => {
                   </div>
                   
                   {/* Position all points based on their coordinates */}
-                  {searchResults.map((result, index) => (
-                    <div 
-                      key={index}
-                      className="absolute group"
-                      style={{
-                        left: `${Math.min(Math.max((result.coords[0] / 100) * 100, 5), 95)}%`,
-                        top: `${Math.min(Math.max((result.coords[1] / 100) * 100, 5), 95)}%`,
-                      }}
-                    >
-                      <div className={`w-4 h-4 ${result.color} rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-md hover:w-5 hover:h-5 transition-all duration-200`}></div>
-                      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-10">
-                        {result.word} ({result.scalar})
+                  {searchResults.map((result, index) => {
+                    const [viewX, viewY] = toViewportCoords(result.coords);
+                    return (
+                      <div 
+                        key={index}
+                        className="absolute group"
+                        style={{
+                          left: `${viewX}%`,
+                          top: `${viewY}%`,
+                        }}
+                      >
+                        <div className={`w-4 h-4 ${result.color} rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-md hover:w-5 hover:h-5 transition-all duration-200`}></div>
+                        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-10">
+                          {result.word} ({result.scalar})
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+              </div>
+              
+              {/* Add zoom controls */}
+              <div className="flex justify-center mt-2">
+                <button 
+                  onClick={() => setMapView(prev => ({
+                    ...prev,
+                    viewportWidth: prev.viewportWidth * 0.8,
+                    viewportHeight: prev.viewportHeight * 0.8
+                  }))}
+                  className="px-3 py-1 bg-blue-500 text-white rounded-l hover:bg-blue-600"
+                >
+                  Zoom In
+                </button>
+                <button
+                  onClick={() => setMapView({
+                    center: TARGET_COORDINATES,
+                    zoom: 1,
+                    viewportWidth: 100,
+                    viewportHeight: 100
+                  })}
+                  className="px-3 py-1 bg-gray-200 hover:bg-gray-300"
+                >
+                  Reset
+                </button>
+                <button 
+                  onClick={() => setMapView(prev => ({
+                    ...prev,
+                    viewportWidth: prev.viewportWidth * 1.25,
+                    viewportHeight: prev.viewportHeight * 1.25
+                  }))}
+                  className="px-3 py-1 bg-blue-500 text-white rounded-r hover:bg-blue-600"
+                >
+                  Zoom Out
+                </button>
               </div>
             </div>
           ) : (
@@ -183,7 +265,13 @@ const PolysemanticNeurons = () => {
               <div className="bg-white rounded-lg p-8 max-w-md text-center shadow-xl transform transition-all">
                 <div className="mb-4 text-7xl">🎉</div>
                 <h3 className="text-2xl font-bold text-green-600 mb-4">Congratulations!</h3>
-                <p className="text-lg mb-6">You found the hidden word: <span className="font-bold">{TARGET_WORD}</span>!</p>
+                <p className="text-lg mb-2">You found the hidden word: <span className="font-bold">{TARGET_WORD}</span>!</p>
+                {/* Score display */}
+                <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                <p className="text-md mb-1">Your Score: <span className="font-bold text-blue-600 text-xl">{calculateScore().score}</span></p>
+                <p className="text-sm text-gray-600">Found in {calculateScore().attempts} {calculateScore().attempts === 1 ? 'attempt' : 'attempts'}</p>
+                </div>
+
                 <button 
                   onClick={closeWinPopup}
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
@@ -196,10 +284,10 @@ const PolysemanticNeurons = () => {
         </div>
         
         <div className="bg-white/70 rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">About Polysemantic Neurons</h2>
+          <h2 className="text-xl font-semibold mb-4">About FeatureHunt</h2>
           <p className="text-gray-600">
-            Polysemantic neurons are individual neurons in neural networks that respond to multiple unrelated concepts.
-            This tool allows you to explore how different words map to a 2D representation of neural activation patterns.
+            Guess the word! Each guess will appear on the map, so you can see the distance to the real word in latent space
+            as well as how much a feature corresponding to the word is activated. The feature is "references to [the word] in various contexts and forms."
           </p>
         </div>
       </div>
@@ -207,4 +295,4 @@ const PolysemanticNeurons = () => {
   );
 };
 
-export default PolysemanticNeurons;
+export default FeatureHunt;

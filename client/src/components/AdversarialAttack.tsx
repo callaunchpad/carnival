@@ -6,6 +6,9 @@ const AdversarialAttack: React.FC = () => {
   const [drawnPoints, setDrawnPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [result, setResult] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showCongrats, setShowCongrats] = useState(false);
+  const [prediction, setPrediction] = useState<number | null>(null);
+  const [flattenedPoints, setFlattenedPoints] = useState<number[]>([]);
 
   const canvasSize = 280;
   const imageSize = 28;
@@ -90,11 +93,6 @@ const AdversarialAttack: React.FC = () => {
     setFlattenedPoints([]);
   };
 
-  const [showCongrats, setShowCongrats] = useState(false);
-  const [prediction, setPrediction] = useState<number | null>(null);
-
-  const [flattenedPoints, setFlattenedPoints] = useState<number[]>([]);
-
   const handleSubmit = async () => {
     setIsLoading(true);
     setResult(null);
@@ -135,138 +133,109 @@ const AdversarialAttack: React.FC = () => {
       setIsLoading(false);
     }
   };
-  
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        fontFamily: 'sans-serif',
-        color: '#000',
-      }}
-    >
-      <h1>Adversarial Attack</h1>
-      <p>Click on cells in the 28x28 grid to fill them with white.</p>
+    <div className="flex min-h-screen flex-col items-center justify-center p-6 text-gray-800 font-sans">
+      <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8 mb-8">
+        <h1 className="text-3xl font-bold text-center mb-2 text-red-700">Adversarial Attack</h1>
+        <div className="h-1 w-20 bg-red-500 mx-auto mb-6 rounded-full"></div>
+        
+        <p className="text-center mb-6 text-gray-600">
+          Click on cells to modify the image with white pixels. Try to fool the neural network!
+        </p>
 
-      <canvas
-        ref={canvasRef}
-        width={canvasSize}
-        height={canvasSize}
-        onClick={handleCanvasClick}
-        style={{
-          border: '1px solid #ccc',
-          margin: '20px 0',
-          cursor: 'pointer',
-        }}
-      />
-
-      <div style={{ marginBottom: '15px' }}>
-        <button
-          onClick={handleSubmit}
-          disabled={isLoading || drawnPoints.length === 0}
-          style={{
-            padding: '8px 16px',
-            marginRight: '10px',
-            backgroundColor: drawnPoints.length === 0 ? '#ccc' : '#4caf50',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: drawnPoints.length === 0 ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {isLoading ? 'Submitting...' : 'Submit'}
-        </button>
-
-        <button
-          onClick={handleClear}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#f44336',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
-          Clear
-        </button>
-      </div>
-
-      {drawnPoints.length > 0 && (
-        <div>
-          <p>Points selected: {drawnPoints.length}</p>
+        <div className="flex justify-center">
+          <div className="relative">
+            <canvas
+              ref={canvasRef}
+              width={canvasSize}
+              height={canvasSize}
+              onClick={handleCanvasClick}
+              className="border-2 border-red-200 rounded-lg shadow-md cursor-pointer transition-transform hover:scale-[1.02]"
+            />
+            {isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-70 rounded-lg">
+                <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
+          </div>
         </div>
-      )}
 
-      {result && (
-        <div
-          style={{
-            marginTop: '15px',
-            padding: '10px',
-            borderRadius: '4px',
-            boxShadow: '0 0 5px rgba(0,0,0,0.1)',
-            maxWidth: '90%',
-          }}
-        >
-          <p>{result}</p>
+        <div className="flex justify-between mt-6 mb-4">
+          <div className="bg-red-50 py-2 px-4 rounded-lg">
+            <p className="text-red-700 font-medium">Points selected: <span className="font-bold">{drawnPoints.length}</span></p>
+          </div>
+          
           {prediction !== null && (
-            <p>Model prediction: <strong>{prediction}</strong></p>
+            <div className="bg-red-50 py-2 px-4 rounded-lg">
+              <p className="text-red-700 font-medium">Prediction: <span className="font-bold text-xl">{prediction}</span></p>
+            </div>
           )}
         </div>
-      )}
 
-      {/* Congratulations Popup */}
-      {showCongrats && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            zIndex: 100,
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: 'white',
-              padding: '30px',
-              borderRadius: '8px',
-              textAlign: 'center',
-              maxWidth: '80%',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
-            }}
+        <div className="flex space-x-4 mt-6">
+          <button
+            onClick={handleSubmit}
+            disabled={isLoading || drawnPoints.length === 0}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium shadow-md transition-colors ${
+              drawnPoints.length === 0 
+                ? 'bg-gray-300 cursor-not-allowed text-gray-500' 
+                : 'bg-green-600 hover:bg-green-700 text-white'
+            }`}
           >
-            <h2 style={{ color: '#4caf50', marginTop: 0 }}>Congratulations!</h2>
-            <p style={{ fontSize: '18px' }}>
-              You successfully fooled the model within {drawnPoints.length} changes! It predicted {prediction} instead of 3.
+            {isLoading ? 'Analyzing...' : 'Submit'}
+          </button>
+
+          <button
+            onClick={handleClear}
+            className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-md transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+
+        {result && (
+          <div className="mt-6 p-4 bg-red-50 rounded-lg border border-red-100">
+            <p className="text-red-700">{result}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Instructions card */}
+      <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-6">
+        <h2 className="font-bold text-xl mb-4 text-red-700">How it works</h2>
+        <ol className="list-decimal pl-5 space-y-2 text-gray-700">
+          <li>This is an image of the digit "3" as seen by a neural network</li>
+          <li>Click on grid cells to add white pixels to the image</li>
+          <li>Try to modify the image minimally so the AI misclassifies it</li>
+          <li>Success is when the model predicts any digit other than 3</li>
+        </ol>
+      </div>
+
+      {/* Congratulations Modal */}
+      {showCongrats && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
+          <div className="bg-white rounded-xl p-8 max-w-md mx-4 animate-bounce-in">
+            <div className="flex justify-center mb-4">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-center text-green-600 mb-4">Success!</h2>
+            <p className="text-center mb-6">
+              Amazing! You fooled the model with just {drawnPoints.length} pixel changes!
+              <br />It predicted <span className="font-bold text-xl">{prediction}</span> instead of 3.
             </p>
-            <p style={{ marginBottom: '20px' }}>
-              Your adversarial attack was successful.
-            </p>
-            <button
-              onClick={() => setShowCongrats(false)}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#4caf50',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '16px',
-              }}
-            >
-              Close
-            </button>
+            <div className="flex justify-center">
+              <button
+                onClick={() => setShowCongrats(false)}
+                className="py-2 px-6 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-md transition-colors"
+              >
+                Continue
+              </button>
+            </div>
           </div>
         </div>
       )}

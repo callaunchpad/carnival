@@ -1,7 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import CarnivalLanding from "./components/CarnivalLanding";
 import SurgicalSimulator from "./components/SurgicalSimulator";
-import PolysemanticNeurons from './components/PolysemanticNeurons';
+import FeatureHunt from './components/FeatureHunt';
 import AdversarialAttack from './components/AdversarialAttack';
 
 function App() {
@@ -11,7 +11,7 @@ function App() {
         <Route path="/" element={<CarnivalLanding />} />
         <Route path="/surgical-simulator" element={<SurgicalSimulator />} />
         <Route path="/adversarial-attack" element={<AdversarialAttack />} />
-        <Route path="/polysemantic-neurons" element={<PolysemanticNeurons />} />
+        <Route path="/feature-hunt" element={<FeatureHunt />} />
       </Routes>
     </BrowserRouter>
   );
